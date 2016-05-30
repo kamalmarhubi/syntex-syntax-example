@@ -1,0 +1,6 @@
+[package]
+name = "syntex-syntax-example"
+version = "0.1.0"
+authors = ["Kamal Marhubi <kamal@marhubi.com>"]
+
+[dependencies]
