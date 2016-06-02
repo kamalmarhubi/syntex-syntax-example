@@ -20,8 +20,8 @@ fn parse<'a, T: ?Sized + AsRef<Path>>(path: &T,
     let cfgs = vec![];
 
     match parse::parse_crate_from_file(path, cfgs, parse_session) {
-        // There may be parse errors that the parser recovered from, which we want to treat as an
-        // error.
+        // There may be parse errors that the parser recovered from, which we
+        // want to treat as an error.
         Ok(_) if parse_session.span_diagnostic.has_errors() => Err(None),
         Ok(krate) => Ok(krate),
         Err(e) => Err(Some(e)),
@@ -34,9 +34,9 @@ fn main() {
     let krate = parse(args[1].as_str(), &parse_session).unwrap();
 
     let mut counts: Vec<_> = count_fn_args(&krate, parse_session.codemap()).into_iter().collect();
-    // We could just `sort` instead of `sort_by`, since the (name, count) pair would sort by name
-    // first. But I wanted there to be a closure in here for running the program against its own
-    // source. :-)
+    // We could just `sort` instead of `sort_by`, since the (name, count) pair
+    // would sort by name first. But I wanted there to be a closure in here for
+    // running the program against its own source. :-)
     counts.sort_by(|x, y| x.0.cmp(&y.0));
 
     println!("{} {}", "FUNCTION".with_exact_width(32), "ARGS");
@@ -47,7 +47,8 @@ fn main() {
 
 struct CountFnArgs<'a> {
     arg_counts: HashMap<String, usize>,
-    // The codemap is necessary to go from a `Span` to actual line & column numbers for closures.
+    // The codemap is necessary to go from a `Span` to actual line & column
+    // numbers for closures.
     codemap: &'a CodeMap,
 }
 
@@ -78,20 +79,24 @@ impl<'v, 'a> Visitor<'v> for CountFnArgs<'a> {
 
         self.arg_counts.insert(fn_name, fn_decl.inputs.len());
 
-        // Continue walking the rest of the funciton so we pick up any functions or closures
-        // defined in its body.
+        // Continue walking the rest of the funciton so we pick up any functions
+        // or closures defined in its body.
         visit::walk_fn(self, fn_kind, fn_decl, block, span);
     }
 
-    // The default implementation panics, so this is needed to work on files with macro
-    // invocations, eg calls to `format!()` above. A better solution would be to expand macros before
-    // walking the AST, but I haven't looked at how to do that. We will miss any functions defined
-    // via a macro, but that's fine for this example.
+    // The default implementation panics, so this is needed to work on files
+    // with macro invocations, eg calls to `format!()` above. A better solution
+    // would be to expand macros before walking the AST, but I haven't looked at
+    // how to do that. We will miss any functions defined via a macro, but
+    // that's fine for this example.
     fn visit_mac(&mut self, _mac: &'v ast::Mac) {}
 }
 
 fn count_fn_args(krate: &ast::Crate, codemap: &CodeMap) -> HashMap<String, usize> {
-    let mut visitor = CountFnArgs { arg_counts: HashMap::new(), codemap: codemap };
+    let mut visitor = CountFnArgs {
+        arg_counts: HashMap::new(),
+        codemap: codemap,
+    };
     visitor.visit_mod(&krate.module, krate.span, 0);
 
     visitor.arg_counts
