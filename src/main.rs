@@ -6,6 +6,7 @@ use std::env;
 use std::path::Path;
 
 use pad::PadStr;
+use syntax::codemap::FilePathMapping;
 
 use syntax::ast;
 use syntax::codemap::{CodeMap, Loc, Span};
@@ -17,9 +18,8 @@ fn parse<'a, T: ?Sized + AsRef<Path>>(path: &T,
                                       parse_session: &'a ParseSess)
                                       -> Result<ast::Crate, Option<DiagnosticBuilder<'a>>> {
     let path = path.as_ref();
-    let cfgs = vec![];
 
-    match parse::parse_crate_from_file(path, cfgs, parse_session) {
+    match parse::parse_crate_from_file(path,  parse_session) {
         // There may be parse errors that the parser recovered from, which we
         // want to treat as an error.
         Ok(_) if parse_session.span_diagnostic.has_errors() => Err(None),
@@ -30,7 +30,7 @@ fn parse<'a, T: ?Sized + AsRef<Path>>(path: &T,
 
 fn main() {
     let args: Vec<String> = env::args().collect();
-    let parse_session = ParseSess::new();
+    let parse_session = ParseSess::new(FilePathMapping::empty());
     let krate = parse(args[1].as_str(), &parse_session).unwrap();
 
     let mut counts: Vec<_> = count_fn_args(&krate, parse_session.codemap()).into_iter().collect();
@@ -68,20 +68,19 @@ impl<'v, 'a> Visitor<'v> for CountFnArgs<'a> {
     fn visit_fn(&mut self,
                 fn_kind: FnKind<'v>,
                 fn_decl: &'v ast::FnDecl,
-                block: &'v ast::Block,
                 span: Span,
                 _id: ast::NodeId) {
         let fn_name = match fn_kind {
-            FnKind::ItemFn(id, _, _, _, _, _) |
-            FnKind::Method(id, _, _) => id.name.as_str().to_string(),
-            FnKind::Closure => format!("<closure at {}>", self.format_span(span)),
+            FnKind::ItemFn(id, _, _, _, _, _, _) |
+            FnKind::Method(id, _, _, _) => id.name.as_str().to_string(),
+            FnKind::Closure(_) => format!("<closure at {}>", self.format_span(span)),
         };
 
         self.arg_counts.insert(fn_name, fn_decl.inputs.len());
 
         // Continue walking the rest of the funciton so we pick up any functions
         // or closures defined in its body.
-        visit::walk_fn(self, fn_kind, fn_decl, block, span);
+        visit::walk_fn(self, fn_kind, fn_decl, span);
     }
 
     // The default implementation panics, so this is needed to work on files
@@ -97,7 +96,7 @@ fn count_fn_args(krate: &ast::Crate, codemap: &CodeMap) -> HashMap<String, usize
         arg_counts: HashMap::new(),
         codemap: codemap,
     };
-    visitor.visit_mod(&krate.module, krate.span, 0);
+    visitor.visit_mod(&krate.module, krate.span, &krate.attrs, krate.module.items[0].id);
 
     visitor.arg_counts
 }
